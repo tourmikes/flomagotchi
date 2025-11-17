@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#f6f3ee" />
+  <title>FlowState Balance — Cozy Edition</title>
+  <link rel="manifest" href='data:application/manifest+json,{
+    "name":"FlowState Balance — Cozy",
+    "short_name":"FSB Cozy",
+    "start_url":".",
+    "display":"standalone",
+    "background_color":"#f6f3ee",
+    "theme_color":"#2a2928",
+    "icons":[]
+  }'>
+  <style>
+    :root{
+      --paper:#f6f3ee; --ink:#2a2928; --muted:#6e6a67; --line:#bfb8b1; --soft:#d9d2cb; --shade:#ece7e1; --accent:#2a2928;
+      --tap: 48px; --radius: 16px; --pad: 16px; --pad-sm: 8px;
+      --font: ui-rounded, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%; background:var(--paper); color:var(--ink); font-family:var(--font);}
+    body{margin:0; display:flex; flex-direction:column;}
+    header{position:sticky; top:0; z-index:10; background:var(--paper); border-bottom:1px solid var(--line);}
+    .app-title{font-weight:800; padding:10px var(--pad); display:flex; align-items:center; gap:10px}
+    .heart{display:inline-block; width:10px; height:10px; border-radius:50%; background:var(--ink); box-shadow:6px 0 0 0 var(--ink); transform:rotate(-45deg); position:relative; margin-left:6px}
+    .heart:after{content:""; position:absolute; width:14px; height:14px; border-radius:50%; background:var(--ink); top:-7px; left:3px}
+    nav{display:flex; border-bottom:1px solid var(--line);}
+    nav button{flex:1; padding:10px; font-size:14px; background:transparent; border:0; border-right:1px solid var(--line); height:var(--tap); border-radius:0}
+    nav button:last-child{border-right:0}
+    nav button.active{background:var(--shade)}
+    main{flex:1; overflow:auto;}
+    section{display:none; padding:var(--pad); max-width:1000px; margin:0 auto}
+    section.active{display:block}
+    /* EXTRA GUARANTEE: anything tagged settings-only is hidden unless Settings tab is active */
+    body:not(.tab-settings) [data-settings-only]{display:none !important}
+    .row{display:flex; gap:var(--pad); align-items:center; flex-wrap:wrap}
+    .stack{display:flex; flex-direction:column; gap:10px}
+    label{font-size:12px; color:var(--muted)}
+    input[type=date]{height:var(--tap); padding:0 12px; border:1px solid var(--line); border-radius:var(--radius); background:#fff; color:var(--ink)}
+    .pad{display:grid; grid-template-columns:repeat(3,1fr); gap:10px}
+    .pad button{height:var(--tap); border:1px solid var(--ink); background:#fff; border-radius:999px; font-size:15px; font-weight:700}
+    .pending{font-size:28px; font-weight:800}
+    .pill{display:inline-block; border:1px solid var(--line); border-radius:999px; padding:6px 12px; font-size:12px; background:#fff}
+    input[type=range]{width:100%}
+    .intensity-scale{display:flex; justify-content:space-between; font-size:12px; color:var(--muted)}
+    .btn{height:var(--tap); padding:0 16px; border:2px solid var(--ink); background:#fff; border-radius:999px; font-weight:800}
+    .btn.primary{background:var(--ink); color:#fff}
+    .btn.ghost{background:transparent}
+    .card{border:1px solid var(--line); border-radius:var(--radius); padding:var(--pad); background:var(--shade)}
+    .chart-wrap{border:1px solid var(--line); border-radius:var(--radius); padding:var(--pad); background:#fff}
+    canvas{width:100%; height:260px; display:block}
+    .legend{display:flex; gap:16px; align-items:center; font-size:12px; color:var(--muted); padding-top:8px}
+    .legend .key{display:inline-block; width:24px; height:2px; background:var(--ink)}
+    .legend .key.dotted{background:repeating-linear-gradient(90deg,var(--ink) 0 4px,transparent 4px 8px)}
+    .legend .key.thin{height:1px}
+    .gauge{position:relative; height:36px; border:1px solid var(--line); border-radius:999px; background:#fff}
+    .gauge .zone{position:absolute; top:0; bottom:0; background:#e8e4de}
+    .gauge .marker{position:absolute; top:-7px; width:0; height:0; border-left:7px solid transparent; border-right:7px solid transparent; border-bottom:7px solid var(--ink)}
+    .gauge .scale{display:flex; justify-content:space-between; font-size:12px; color:var(--muted); margin-top:6px}
+    .hint{padding:8px 12px; border:1px dashed var(--soft); color:var(--muted); border-radius:var(--radius); background:#fafafa}
+    .hidden{display:none !important}
+    /* Focus Buddy */
+    .buddy{display:flex; align-items:center; gap:14px}
+    .buddy-face{width:72px; height:72px; border-radius:50%; background:#fff; border:2px solid var(--ink); position:relative}
+    .eye{position:absolute; width:6px; height:6px; background:var(--ink); border-radius:50%}
+    .eye.left{left:24px; top:30px}
+    .eye.right{right:24px; top:30px}
+    .mouth{position:absolute; left:50%; top:46px; width:28px; height:16px; margin-left:-14px; border:2px solid var(--ink); border-top:none; border-radius:0 0 20px 20px}
+    .mouth.flat{height:0; border:none; background:var(--ink); width:22px; left:50%; margin-left:-11px; top:46px; height:2px}
+    .mouth.sad{border-top:2px solid var(--ink); border-bottom:none; border-radius:20px 20px 0 0; top:50px}
+    .growth{height:12px; border:1px solid var(--ink); border-radius:999px; background:#fff; overflow:hidden}
+    .growth .fill{height:100%; width:0; background:var(--ink)}
+    @media (min-width:900px){ .grid2{display:grid; grid-template-columns:1.2fr 1fr; gap:var(--pad)} }
+  </style>
+</head>
+<body class="tab-home">
+  <header>
+    <div class="app-title">FlowState Balance <span class="heart"></span> <small style="color:var(--muted);font-weight:500">cozy edition</small></div>
+    <nav id="tabs">
+      <button data-tab="home" class="active">Home</button>
+      <button data-tab="six">6‑Week</button>
+      <button data-tab="macro">Macro</button>
+      <button data-tab="settings">Settings</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- HOME -->
+    <section id="home" class="active" aria-hidden="false">
+      <div class="grid2">
+        <div class="card stack">
+          <div class="buddy">
+            <div class="buddy-face" id="buddyFace">
+              <div class="eye left"></div><div class="eye right"></div><div class="mouth" id="buddyMouth"></div>
+            </div>
+            <div class="stack" style="flex:1">
+              <div class="row" style="justify-content:space-between; width:100%">
+                <div class="pill" id="buddyLevel">Level 1 • Sprout</div>
+                <div class="pill" id="buddyStreak">Streak 0</div>
+              </div>
+              <div class="growth"><div class="fill" id="buddyGrowFill"></div></div>
+              <small id="buddyMsg" style="color:var(--muted)">Hi! I’m your Focus Buddy. Let’s grow together—one gentle session at a time.</small>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="stack" style="min-width:200px">
+              <label for="date">Date</label>
+              <input id="date" type="date" />
+            </div>
+            <div class="stack" style="min-width:180px">
+              <label>Today total (equiv. min)</label>
+              <div id="todayTotal" class="pill">0</div>
+            </div>
+          </div>
+
+          <div class="stack">
+            <label>Add minutes</label>
+            <div class="pending" id="pendingMinutes">0</div>
+            <div class="pad">
+              <button data-add="10">+10</button>
+              <button data-add="30">+30</button>
+              <button data-add="60">+60</button>
+            </div>
+            <div class="row">
+              <button id="undoBtn" class="btn ghost">Undo</button>
+              <button id="clearPendingBtn" class="btn ghost">Clear</button>
+            </div>
+          </div>
+
+          <div class="stack">
+            <label>Intensity (1–5)</label>
+            <input id="intensity" type="range" min="1" max="5" step="1" value="3" />
+            <div class="intensity-scale"><span>1 Very light</span><span>5 Deep flow</span></div>
+          </div>
+
+          <div class="row">
+            <button id="saveSession" class="btn primary">Save session</button>
+            <div id="saveMsg" class="pill" style="display:none">Saved ✓ nice work</div>
+          </div>
+        </div>
+
+        <div class="card stack">
+          <label>Today's sessions</label>
+          <div id="sessionList" class="stack" style="min-height:60px"></div>
+          <small class="muted">Small steps count. Multiple sessions per day are summed into your FSS (equiv. minutes).</small>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6-WEEK -->
+    <section id="six" aria-hidden="true" inert>
+      <div id="sixHint" class="hint hidden">Tip: Rotate to landscape for the clearest 6‑week view.</div>
+      <div class="chart-wrap">
+        <canvas id="sixChart" width="900" height="300" aria-label="6‑week load chart" role="img"></canvas>
+        <div class="legend">
+          <span class="key"></span> CFL 42d (solid)
+          <span class="key dotted"></span> AFL 7d (dotted)
+          <span class="key thin"></span> FSB (thin)
+        </div>
+      </div>
+      <div class="card stack" id="sixRatioCard" style="margin-top:12px">
+        <div class="row" style="align-items:flex-end; gap:20px">
+          <div class="stack" style="flex:1">
+            <label>Load Ratio (AFL / CFL)</label>
+            <div class="gauge" id="ratioGaugeSix">
+              <div class="zone" id="optimalZoneSix"></div>
+              <div class="marker" id="ratioMarkerSix" title="Current ratio"></div>
+            </div>
+            <div class="gauge scale"><span>0.5</span><span>1.0</span><span>1.5</span><span>2.0</span></div>
+          </div>
+          <div class="stack" style="min-width:220px">
+            <label>Current</label>
+            <div class="pending" id="ratioValueSix">—</div>
+            <div id="ratioLabelSix" class="pill">—</div>
+            <small id="ratioBuddyMsg" class="muted">Gentle reminder: balance stimulation and rest.</small>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MACRO -->
+    <section id="macro" aria-hidden="true" inert>
+      <div id="macroHint" class="hint hidden">Tip: Rotate to landscape for a wider macro chart.</div>
+      <div class="row" style="margin-bottom:10px">
+        <span class="pill">Range:</span>
+        <div id="macroRanges" class="row" role="group" aria-label="Time ranges">
+          <button class="btn ghost" data-range="6">6m</button>
+          <button class="btn ghost" data-range="9">9m</button>
+          <button class="btn ghost active" data-range="12">12m</button>
+          <button class="btn ghost" data-range="24">24m</button>
+        </div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="macroChart" width="900" height="300" aria-label="Macro load chart" role="img"></canvas>
+        <div class="legend">
+          <span class="key"></span> CFL 42d (solid)
+          <span class="key dotted"></span> AFL 7d (dotted)
+          <span class="key thin"></span> FSB (thin)
+        </div>
+      </div>
+    </section>
+
+    <!-- SETTINGS (only place where these appear) -->
+    <section id="settings" aria-hidden="true" inert class="stack">
+      <div class="card stack" data-settings-only>
+        <label>Data</label>
+        <div class="row">
+          <button id="resetAll" class="btn">Reset Data</button>
+          <button id="loadDemo" class="btn ghost">Load Demo Data</button>
+        </div>
+        <small class="muted">Reset clears all stored sessions (including demo). Load Demo adds a realistic sample set.</small>
+      </div>
+
+      <div class="card stack" data-settings-only>
+        <label>Export</label>
+        <div class="row">
+          <button id="exportDaily" class="btn">Export CSV (Daily)</button>
+          <button id="exportSessions" class="btn ghost">Export CSV (Sessions)</button>
+        </div>
+      </div>
+
+      <div class="card stack" data-settings-only>
+        <label>About</label>
+        <p style="margin:0">This cozy edition adds a friendly <strong>Focus Buddy</strong> who grows with you. All logic runs offline and data is saved to LocalStorage. Grayscale-easy for e‑ink displays (e.g., 800×480). EMA time constants: 7d (AFL), 42d (CFL). FSB = AFL − CFL. FSS = minutes × intensity weight.</p>
+        <ul style="margin:8px 0 0 18px; padding:0">
+          <li>Weights: 1→0.6, 2→0.8, 3→1.0, 4→1.2, 5→1.5</li>
+          <li>Ratio labels: Optimal 0.9–1.1; High Fatigue &gt;1.2; Low Stimulus &lt;0.8</li>
+          <li>Levels: based on last 30 days of FSS; streak shows consecutive focus days.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <script>
+  (()=>{
+    const LS_KEY = 'FSB_SESSIONS_V1';
+    const INTENSITY_W = {1:0.6,2:0.8,3:1.0,4:1.2,5:1.5};
+    const TAU_AFL = 7, TAU_CFL = 42;
+
+    const tabs = document.getElementById('tabs');
+    const sections = [...document.querySelectorAll('main section')];
+    const dateEl = document.getElementById('date');
+    const todayTotalEl = document.getElementById('todayTotal');
+    const pendingEl = document.getElementById('pendingMinutes');
+    const sessionListEl = document.getElementById('sessionList');
+    const intensityEl = document.getElementById('intensity');
+    const saveBtn = document.getElementById('saveSession');
+    const saveMsg = document.getElementById('saveMsg');
+    const undoBtn = document.getElementById('undoBtn');
+    const clearPendingBtn = document.getElementById('clearPendingBtn');
+
+    const sixCanvas = document.getElementById('sixChart');
+    const macroCanvas = document.getElementById('macroChart');
+    const sixHint = document.getElementById('sixHint');
+    const macroHint = document.getElementById('macroHint');
+
+    const ratioValueSix = document.getElementById('ratioValueSix');
+    const ratioLabelSix = document.getElementById('ratioLabelSix');
+    const ratioMarkerSix = document.getElementById('ratioMarkerSix');
+    const optimalZoneSix = document.getElementById('optimalZoneSix');
+    const ratioBuddyMsg = document.getElementById('ratioBuddyMsg');
+
+    const resetAllBtn = document.getElementById('resetAll');
+    const loadDemoBtn = document.getElementById('loadDemo');
+    const exportDailyBtn = document.getElementById('exportDaily');
+    const exportSessionsBtn = document.getElementById('exportSessions');
+    const macroRanges = document.getElementById('macroRanges');
+
+    let sessions = loadSessions();
+    let pendingAdds = [];
+    let macroMonths = 12;
+
+    function todayLocal(){ const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); }
+    function setDateDefault(){ dateEl.value = todayLocal(); }
+    function loadSessions(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||'[]'); } catch(e){ return []; } }
+    function saveSessions(){ localStorage.setItem(LS_KEY, JSON.stringify(sessions)); }
+    function addSession(date, minutes, intensity){ sessions.push({date, minutes, intensity, ts: Date.now()}); saveSessions(); }
+    function removeAllSessions(){ sessions = []; saveSessions(); }
+
+    function groupByDate(){
+      const map = new Map();
+      for(const s of sessions){
+        const w = INTENSITY_W[s.intensity]||1;
+        const fss = (s.minutes||0) * w;
+        const prev = map.get(s.date) || {minutes:0, fss:0, details:[]};
+        prev.minutes += s.minutes||0;
+        prev.fss += fss;
+        prev.details.push({...s, fss});
+        map.set(s.date, prev);
+      }
+      return map;
+    }
+
+    function dateRange(startISO, endISO){
+      const arr = []; let d=new Date(startISO); const end=new Date(endISO);
+      while(d<=end){ arr.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); }
+      return arr;
+    }
+    function addDays(iso,n){ const d=new Date(iso); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+    function computeDaysWindow(daysBack){ const end=todayLocal(); const start=addDays(end,-daysBack+1); return dateRange(start,end); }
+    function getMinMaxDate(){ if(!sessions.length){ const t=todayLocal(); return {min:t,max:t}; } let min=sessions[0].date,max=sessions[0].date; for(const s of sessions){ if(s.date<min) min=s.date; if(s.date>max) max=s.date; } return {min,max}; }
+
+    function ema(values, tau){
+      const alpha = 1 - Math.exp(-1/tau); const out = []; let prev = values[0]||0;
+      for(let i=0;i<values.length;i++){ const x=values[i]||0; const y = prev + alpha*(x - prev); out.push(y); prev=y; }
+      return out;
+    }
+    function computeSeries(allDays){
+      const byDate = groupByDate();
+      const fss = allDays.map(d => (byDate.get(d)?.fss)||0);
+      const afl = ema(fss, TAU_AFL);
+      const cfl = ema(fss, TAU_CFL);
+      const fsb = afl.map((a,i)=> a - cfl[i]);
+      return {fss, afl, cfl, fsb};
+    }
+
+    function weekendShade(ctx, xScale, yBase, days){
+      ctx.save(); ctx.fillStyle='#f0ebe5';
+      for(let i=0;i<days.length;i++){ const d=new Date(days[i]); const dow=d.getUTCDay(); if(dow===0||dow===6){ const x=xScale(i); const w=xScale(i+1)-xScale(i); ctx.fillRect(x,0,w,yBase);} }
+      ctx.restore();
+    }
+    function drawChart(canvas, days, series){
+      const ctx = canvas.getContext('2d');
+      canvas.width = canvas.clientWidth * devicePixelRatio;
+      canvas.height = canvas.clientHeight * devicePixelRatio;
+      ctx.scale(devicePixelRatio, devicePixelRatio);
+      const cw = canvas.clientWidth, ch = canvas.clientHeight;
+      const padL=36, padR=8, padT=12, padB=24;
+      const plotW=cw-padL-padR, plotH=ch-padT-padB;
+      ctx.clearRect(0,0,cw,ch);
+      const all=[...series.afl,...series.cfl,...series.fsb];
+      let yMin=Math.min(0,...all), yMax=Math.max(10,...all); if(yMax===yMin) yMax=yMin+1;
+      const xScale=(i)=> padL + (i/(days.length-1))*plotW;
+      const yScale=(v)=> padT + (1 - (v - yMin)/(yMax - yMin))*plotH;
+      ctx.strokeStyle='#d4cdc6'; ctx.lineWidth=1;
+      for(let i=0;i<=4;i++){ const y=padT + (i/4)*plotH; ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(cw-padR,y); ctx.stroke(); }
+      weekendShade(ctx, xScale, ch, days);
+      if(yMin<0 && yMax>0){ ctx.strokeStyle='#bfb8b1'; ctx.lineWidth=1; ctx.setLineDash([4,4]); const y0=yScale(0); ctx.beginPath(); ctx.moveTo(padL,y0); ctx.lineTo(cw-padR,y0); ctx.stroke(); ctx.setLineDash([]); }
+      function drawLine(vals, style){ ctx.beginPath(); for(let i=0;i<vals.length;i++){ const x=xScale(i), y=yScale(vals[i]); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);} ctx.strokeStyle=style.color; ctx.lineWidth=style.width||2; if(style.dash) ctx.setLineDash(style.dash); else ctx.setLineDash([]); ctx.stroke(); }
+      drawLine(series.cfl,{color:'#2a2928',width:2}); drawLine(series.afl,{color:'#2a2928',width:2,dash:[6,6]}); drawLine(series.fsb,{color:'#2a2928',width:1});
+      ctx.fillStyle='#2a2928'; ctx.font='12px system-ui'; const labels=5;
+      for(let i=0;i<=labels;i++){ const v=yMin + (i/labels)*(yMax-yMin); const y=padT + (1 - i/labels)*plotH; ctx.fillText(v.toFixed(0), 4, y+4); }
+      const first=days[0], mid=days[Math.floor(days.length/2)], last=days[days.length-1];
+      ctx.fillText(first.slice(5), padL, ch-6); ctx.fillText(mid.slice(5), padL+plotW/2-14, ch-6); ctx.fillText(last.slice(5), cw-padR-42, ch-6);
+    }
+
+    function setGaugeSix(ratio){
+      const min=0.5,max=2.0; let r=(!isFinite(ratio)||ratio<=0)?0:ratio;
+      ratioValueSix.textContent = r ? r.toFixed(2) : '—';
+      let label='—', buddyText='Gentle reminder: balance stimulation and rest.';
+      if(r>1.2){ label='Caution: High Fatigue'; buddyText='Buddy is a bit tired—consider lighter focus or a break.'; setBuddyFace('sad'); }
+      else if(r<0.8){ label='Caution: Low Stimulus'; buddyText='Buddy is sleepy—try a focused 10–30 min push.'; setBuddyFace('flat'); }
+      else if(r>=0.9 && r<=1.1){ label='Optimal Balance'; buddyText='Lovely balance—Buddy is smiling.'; setBuddyFace('smile'); }
+      else { label='Near Optimal'; buddyText='Nice pacing—small adjustments keep it comfy.'; setBuddyFace('smile'); }
+      ratioLabelSix.textContent = label; ratioBuddyMsg.textContent = buddyText;
+      const pct=Math.max(0,Math.min(1,(Math.max(min,Math.min(max,r))-min)/(max-min))); ratioMarkerSix.style.left=`calc(${(pct*100).toFixed(2)}% - 7px)`;
+      const ozMin=0.8, ozMax=1.2; const ozL=((ozMin-min)/(max-min))*100; const ozW=((ozMax-ozMin)/(max-min))*100; optimalZoneSix.style.left=ozL+'%'; optimalZoneSix.style.width=ozW+'%';
+    }
+    function updateRatioSix(){
+      const days = computeDaysWindow(60);
+      const series = computeSeries(days);
+      const idx = series.afl.length - 1;
+      const afl = series.afl[idx]||0, cfl = series.cfl[idx]||0;
+      const ratio = (cfl>0) ? (afl/cfl) : 0;
+      setGaugeSix(ratio);
+      updateBuddyLevelAndStreak();
+    }
+
+    function setBuddyFace(mode){
+      const m = document.getElementById('buddyMouth'); m.className='mouth'; if(mode==='flat') m.classList.add('flat'); else if(mode==='sad') m.classList.add('sad');
+    }
+    function last30FSS(){
+      const end=todayLocal(); const start=addDays(end,-29); const days=dateRange(start,end); const series=computeSeries(days); return series.fss.reduce((a,b)=>a+b,0);
+    }
+    function levelFromFSS(total){
+      const step=300; let lvl=Math.min(10,Math.max(1,Math.floor(total/step)+1));
+      const names=['Sprout','Seedling','Sapling','Leafy','Branching','Blossom','Grove','Forest','Ancient','Evergreen'];
+      return {level:lvl,label:names[lvl-1],step};
+    }
+    function computeStreak(){
+      const end=todayLocal(); let streak=0; const byDate=groupByDate();
+      for(let i=0;i<365;i++){ const d=addDays(end,-i); const rec=byDate.get(d); const fss=rec?rec.fss:0; if(fss>0) streak++; else break; }
+      return streak;
+    }
+    function updateBuddyLevelAndStreak(){
+      const total=last30FSS(); const {level,label,step}=levelFromFSS(total);
+      document.getElementById('buddyLevel').textContent = `Level ${level} • ${label}`;
+      const streak=computeStreak(); document.getElementById('buddyStreak').textContent = `Streak ${streak}`;
+      const inLevel=total%step; const pct=Math.min(100,Math.round((inLevel/step)*100)); document.getElementById('buddyGrowFill').style.width=pct+'%';
+      const buddyMsg=document.getElementById('buddyMsg');
+      if(streak>=5) buddyMsg.textContent='The routine feels cozy—keep it gentle and steady.';
+      else if(total>=step) buddyMsg.textContent='Bud is growing new leaves—beautiful progress!';
+      else buddyMsg.textContent='Hi! I’m your Focus Buddy. Let’s grow together—one gentle session at a time.';
+    }
+
+    function sixWeekRender(){ const days=computeDaysWindow(42); const series=computeSeries(days); drawChart(sixCanvas,days,series); updateRatioSix(); }
+    function macroRender(){
+      const months=macroMonths; const end=todayLocal(); const startDate=new Date(end);
+      startDate.setMonth(startDate.getMonth()-months+1); startDate.setDate(1); startDate.setMinutes(startDate.getMinutes()-startDate.getTimezoneOffset());
+      const startISO=startDate.toISOString().slice(0,10); const days=dateRange(startISO,end); const series=computeSeries(days); drawChart(macroCanvas,days,series);
+    }
+    function refreshToday(){
+      const map=groupByDate(); const d=dateEl.value||todayLocal(); const rec=map.get(d);
+      todayTotalEl.textContent = rec ? Math.round(rec.fss) : 0;
+      sessionListEl.innerHTML='';
+      if(rec && rec.details.length){
+        for(const it of rec.details.sort((a,b)=>a.ts-b.ts)){
+          const row=document.createElement('div'); row.className='row';
+          row.innerHTML=`<span class="pill">${it.minutes} min @ ${it.intensity}</span><span class="pill">FSS ${Math.round(it.fss)}</span>`;
+          sessionListEl.appendChild(row);
+        }
+      } else { const empty=document.createElement('div'); empty.textContent='No sessions yet—Buddy is ready when you are.'; sessionListEl.appendChild(empty); }
+      updateBuddyLevelAndStreak();
+    }
+
+    function ensureOrientationHints(){ const isPortrait=window.matchMedia('(orientation: portrait)').matches; sixHint.classList.toggle('hidden', !isPortrait); macroHint.classList.toggle('hidden', !isPortrait); }
+
+    tabs.addEventListener('click', (e)=>{
+      if(e.target.tagName!=='BUTTON') return;
+      const id=e.target.dataset.tab;
+      tabs.querySelectorAll('button').forEach(b=>b.classList.toggle('active', b===e.target));
+      sections.forEach(s=>{
+        const active = s.id===id;
+        s.classList.toggle('active', active);
+        s.setAttribute('aria-hidden', String(!active));
+        if('inert' in s) s.inert = !active;
+      });
+      document.body.classList.remove('tab-home','tab-six','tab-macro','tab-settings');
+      document.body.classList.add('tab-'+id);
+
+      if(id==='six') sixWeekRender();
+      if(id==='macro') macroRender();
+      if(id==='home') refreshToday();
+      ensureOrientationHints();
+    });
+
+    function updatePending(){ const sum=pendingAdds.reduce((a,b)=>a+b,0); pendingEl.textContent=sum; }
+    document.querySelectorAll('.pad button').forEach(btn=>{ btn.addEventListener('click', ()=>{ const v=parseInt(btn.dataset.add,10)||0; pendingAdds.push(v); updatePending(); }); });
+    undoBtn.addEventListener('click', ()=>{ pendingAdds.pop(); updatePending(); });
+    clearPendingBtn.addEventListener('click', ()=>{ pendingAdds=[]; updatePending(); });
+
+    saveBtn.addEventListener('click', ()=>{
+      const minutes=pendingAdds.reduce((a,b)=>a+b,0); if(minutes<=0){ flash(saveMsg,'Add minutes first'); return; }
+      const intensity=parseInt(intensityEl.value,10)||3; const date=dateEl.value||todayLocal();
+      addSession(date,minutes,intensity); pendingAdds=[]; updatePending(); refreshToday(); sixWeekRender(); macroRender(); flash(saveMsg,'Saved ✓ nice work');
+    });
+    function flash(el, text){ el.textContent=text||'Saved'; el.style.display='inline-block'; setTimeout(()=>{ el.style.display='none'; },1200); }
+
+    setDateDefault(); refreshToday(); sixWeekRender(); macroRender(); ensureOrientationHints();
+
+    window.addEventListener('resize', ()=>{
+      ensureOrientationHints();
+      if(document.getElementById('six').classList.contains('active')) sixWeekRender();
+      if(document.getElementById('macro').classList.contains('active')) macroRender();
+      if(document.getElementById('home').classList.contains('active')) refreshToday();
+    });
+
+    function download(filename, text){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([text],{type:'text/csv'})); a.download=filename; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); }
+    exportDailyBtn.addEventListener('click', ()=>{
+      const byDate=groupByDate(); const {min,max}=getMinMaxDate(); const days=dateRange(min,max);
+      let csv='date,minutes,fss\n'; for(const d of days){ const r=byDate.get(d)||{minutes:0,fss:0}; csv+=`${d},${Math.round(r.minutes)},${Math.round(r.fss)}\n`; } download('flowstate_daily.csv',csv);
+    });
+    exportSessionsBtn.addEventListener('click', ()=>{
+      let csv='date,minutes,intensity,fss\n'; for(const s of sessions){ const f=(s.minutes||0)*(INTENSITY_W[s.intensity]||1); csv+=`${s.date},${s.minutes},${s.intensity},${Math.round(f)}\n`; } download('flowstate_sessions.csv',csv);
+    });
+
+    resetAllBtn.addEventListener('click', ()=>{ if(confirm('Reset all data?')){ removeAllSessions(); pendingAdds=[]; updatePending(); refreshToday(); sixWeekRender(); macroRender(); } });
+    loadDemoBtn.addEventListener('click', ()=>{
+      if(!confirm('Load demo data (adds to any existing data)?')) return;
+      const today=new Date(); today.setHours(0,0,0,0); const rng=mulberry32(Date.now());
+      for(let i=180;i>=0;i--){ const d=new Date(today); d.setDate(d.getDate()-i); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); const iso=d.toISOString().slice(0,10); const dow=d.getUTCDay(); const baseProb=(dow>=1 && dow<=5)?0.8:0.4; const sessionsN=(rng()<baseProb)?(rng()<0.6?1:2):0; for(let k=0;k<sessionsN;k++){ const minutes=20+Math.round(rng()*70); const intensity=(dow>=1 && dow<=5)?(rng()<0.2?5:(rng()<0.6?4:3)):(rng()<0.6?3:2); addSession(iso,minutes,intensity);} }
+      refreshToday(); sixWeekRender(); macroRender();
+    });
+    function mulberry32(a){ return function(){ let t=a+=0x6D2B79F5; t=Math.imul(t^t>>>15,t|1); t^=t+Math.imul(t^t>>>7, t|61); return ((t^t>>>14)>>>0)/4294967296; } }
+  })();
+  </script>
+</body>
+</html>
